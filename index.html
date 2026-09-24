@@ -464,6 +464,22 @@ function renderCover() {
 
 document.getElementById("reset").addEventListener("click", renderCover);
 renderCover();
+
+/* ===== Auto-atualização: sempre a última versão no endereço limpo ===== */
+// Troque APP_VERSION a cada publicação: os aparelhos abertos recarregam sozinhos quando estiverem na capa.
+const APP_VERSION = "2026-09-24.1";
+if (location.search) history.replaceState(null, "", location.pathname);  // some com ?v=3 etc.
+async function checkUpdate() {
+  try {
+    const html = await (await fetch(location.pathname + "?t=" + Date.now(), { cache: "no-store" })).text();
+    const m = html.match(/const APP_VERSION = "([^"]+)"/);
+    const naCapa = document.querySelector(".cover") && !document.getElementById("fn").value && !document.getElementById("ln").value;
+    if (m && m[1] !== APP_VERSION && naCapa) location.replace(location.pathname + "?t=" + Date.now());
+  } catch {}
+}
+setInterval(() => { if (!document.hidden) checkUpdate(); }, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkUpdate(); });
+checkUpdate();
 </script>
 </body>
 </html>
