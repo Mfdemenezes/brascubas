@@ -258,7 +258,7 @@ function renderResult() {
 
 /* ===== Ranking: banco compartilhado quando publicado; localStorage no arquivo baixado ===== */
 // URL do App da Web do Google Apps Script (termina em /exec). Deixe vazio para salvar só no aparelho.
-const SHEET_API = "https://script.google.com/macros/s/AKfycbyZVbof00anbntT6pudWzI4xa_-nRSgZT6dtfONcmxNV_CyZQBtoRgNA6MXQ_rp4o-4SQ/exec";
+const SHEET_API = "https://script.google.com/macros/s/AKfycbxsTzoxqHhjlqvhktHJf1EWdTU7T8lCgUzQovAMZdBkB4KuQO6FjIB0cPRl_afslV-AcQ/exec";
 
 const LS_KEY = "quiz-bras-cubas-ranking";
 let scores = [];              // todos os resultados
@@ -279,7 +279,7 @@ async function sheetCall(body) {
   const params = new URLSearchParams({ t: Date.now() });
   if (body) {
     params.set("action", body.action || "add");
-    ["nome", "acertos", "total", "tempoMs"].forEach(k => { if (body[k] !== undefined) params.set(k, body[k]); });
+    ["cid", "nome", "acertos", "total", "tempoMs"].forEach(k => { if (body[k] !== undefined) params.set(k, body[k]); });
   }
   const r = await fetch(SHEET_API + "?" + params.toString(), { redirect: "follow" });
   const j = await r.json();
@@ -287,21 +287,45 @@ async function sheetCall(body) {
   return j;
 }
 let sheetOk = false;
+// Resultados que não chegaram na planilha (Wi-Fi caiu): ficam aqui e são reenviados no próximo sync.
+const PENDING_KEY = "quiz-bras-cubas-pendentes";
+function loadPending() { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || "[]"); } catch { return []; } }
+function savePending(list) { try { localStorage.setItem(PENDING_KEY, JSON.stringify(list)); } catch {} }
+function withPending(list) {
+  const ids = new Set(list.map(x => x.id));
+  return list.concat(loadPending().filter(x => !ids.has(x.cid)).map(x => ({ ...x, id: x.cid })));
+}
+let flushing = false;
+async function flushPending() {
+  if (flushing) return;
+  flushing = true;
+  try {
+    for (const x of loadPending()) {
+      await sheetCall(x);  // cid evita duplicar se um envio anterior chegou e só a resposta se perdeu
+      savePending(loadPending().filter(y => y.cid !== x.cid));
+    }
+  } finally { flushing = false; }
+}
 async function syncSheet() {
   if (!SHEET_API) return;
-  try { const j = await sheetCall(); scores = j.scores; sheetOk = true; refreshVisibleRanking(); }
+  try { await flushPending(); } catch {}
+  try { const j = await sheetCall(); scores = withPending(j.scores); sheetOk = true; refreshVisibleRanking(); }
   catch { sheetOk = false; }
 }
 
 async function saveScore(entry) {
   if (SHEET_API) {
+    entry = { ...entry, cid: (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2)) };
     try {
       const j = await sheetCall(entry);
-      scores = j.scores; sheetOk = true;
+      scores = withPending(j.scores); sheetOk = true;
       return j.id;
     } catch (e) {
+      savePending(loadPending().concat(entry));
+      scores = withPending(scores);
       const el = document.getElementById("rank");
-      if (el) el.insertAdjacentHTML("beforebegin", `<p class="note" style="color:var(--bad)">⚠ Não salvou na planilha (${esc(e.message || e)}). Guardado só neste aparelho.</p>`);
+      if (el) el.insertAdjacentHTML("beforebegin", `<p class="note" style="color:var(--bad)">⚠ Sem conexão com a planilha. O resultado ficou guardado e será enviado automaticamente.</p>`);
+      return entry.cid;
     }
   }
   if (dbRef) {
@@ -369,7 +393,7 @@ function refreshVisibleRanking() {
 
 if (SHEET_API) {
   syncSheet();
-  setInterval(() => { if (document.getElementById("rank") && !document.hidden) syncSheet(); }, 15000);
+  setInterval(() => { if (!document.hidden && (document.getElementById("rank") || loadPending().length)) syncSheet(); }, 15000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) syncSheet(); });
 }
 
