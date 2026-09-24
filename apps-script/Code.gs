@@ -4,15 +4,19 @@
  * Contrato usado pelo index.html (tudo via GET, sem preflight de CORS):
  *   ?                      → lista
  *   ?action=add&cid=..&nome=..&acertos=..&total=..&tempoMs=..
- *   ?action=clear          → move tudo para a aba "Arquivo" (nada é apagado de verdade)
+ *   ?action=clear          → move tudo para a aba de arquivo (nada é apagado de verdade)
+ *   &quiz=dom-casmurro     → usa as abas do outro quiz (sem o parâmetro: Brás Cubas)
  * Resposta: { ok: true, id, scores: [{ id, nome, acertos, total, tempoMs }] }
  *
  * Implantar: Implantar → Nova implantação → App da Web
  *   Executar como: Eu · Quem pode acessar: Qualquer pessoa
  */
 
-const SHEET_NAME = "Ranking";
-const ARCHIVE_NAME = "Arquivo";
+// Um par de abas por quiz. Sem ?quiz= fica o Brás Cubas, que já usava "Ranking"/"Arquivo".
+const QUIZZES = {
+  "": { sheet: "Ranking", archive: "Arquivo" },
+  "dom-casmurro": { sheet: "Dom Casmurro", archive: "Dom Casmurro - Arquivo" },
+};
 const HEADER = ["id", "nome", "acertos", "total", "tempoMs", "quando"];
 
 function doGet(e) {
@@ -22,10 +26,12 @@ function doGet(e) {
   const lock = LockService.getScriptLock();
   try {
     if (action !== "list") lock.waitLock(20000);
-    const sh = sheet_(SHEET_NAME);
+    const quiz = QUIZZES[p.quiz || ""];
+    if (!quiz) throw new Error("quiz inválido");
+    const sh = sheet_(quiz.sheet);
     let id = null;
     if (action === "add") id = add_(sh, p);
-    else if (action === "clear") archive_(sh);
+    else if (action === "clear") archive_(sh, quiz.archive);
     else if (action !== "list") throw new Error("ação inválida");
     return json_({ ok: true, id: id, scores: read_(sh) });
   } catch (err) {
@@ -63,11 +69,11 @@ function read_(sh) {
     .map(r => ({ id: String(r[0]), nome: String(r[1]), acertos: Number(r[2]), total: Number(r[3]), tempoMs: Number(r[4]) }));
 }
 
-function archive_(sh) {
+function archive_(sh, archiveName) {
   const n = sh.getLastRow() - 1;
   if (n < 1) return;
   const rows = sh.getRange(2, 1, n, HEADER.length).getValues();
-  const arq = sheet_(ARCHIVE_NAME);
+  const arq = sheet_(archiveName);
   arq.getRange(arq.getLastRow() + 1, 1, rows.length, HEADER.length).setValues(rows);
   sh.deleteRows(2, n);
 }

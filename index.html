@@ -260,6 +260,7 @@ function renderResult() {
 // URL do App da Web do Google Apps Script (termina em /exec). Deixe vazio para salvar só no aparelho.
 const SHEET_API = "https://script.google.com/macros/s/AKfycbxsTzoxqHhjlqvhktHJf1EWdTU7T8lCgUzQovAMZdBkB4KuQO6FjIB0cPRl_afslV-AcQ/exec";
 
+const QUIZ_ID = "";            // aba na planilha (vazio = Brás Cubas)
 const LS_KEY = "quiz-bras-cubas-ranking";
 let scores = [];              // todos os resultados
 let dbRef = null;             // coleção no banco (se disponível)
@@ -277,6 +278,7 @@ scores = loadLocal();
 
 async function sheetCall(body) {
   const params = new URLSearchParams({ t: Date.now() });
+  if (QUIZ_ID) params.set("quiz", QUIZ_ID);
   if (body) {
     params.set("action", body.action || "add");
     ["cid", "nome", "acertos", "total", "tempoMs"].forEach(k => { if (body[k] !== undefined) params.set(k, body[k]); });
@@ -467,7 +469,7 @@ renderCover();
 
 /* ===== Auto-atualização: sempre a última versão no endereço limpo ===== */
 // Troque APP_VERSION a cada publicação: os aparelhos abertos recarregam sozinhos quando estiverem na capa.
-const APP_VERSION = "2026-09-24.1";
+const APP_VERSION = "2026-09-24.2";
 if (location.search) history.replaceState(null, "", location.pathname);  // some com ?v=3 etc.
 async function checkUpdate() {
   try {
