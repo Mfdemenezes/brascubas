@@ -276,11 +276,14 @@ function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(scores)
 scores = loadLocal();
 
 async function sheetCall(body) {
-  const r = body
-    ? await fetch(SHEET_API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body) })
-    : await fetch(SHEET_API + "?t=" + Date.now());
+  const params = new URLSearchParams({ t: Date.now() });
+  if (body) {
+    params.set("action", body.action || "add");
+    ["nome", "acertos", "total", "tempoMs"].forEach(k => { if (body[k] !== undefined) params.set(k, body[k]); });
+  }
+  const r = await fetch(SHEET_API + "?" + params.toString(), { redirect: "follow" });
   const j = await r.json();
-  if (!j.ok) throw new Error("falha");
+  if (!j.ok) throw new Error(j.erro || "falha");
   return j;
 }
 let sheetOk = false;
@@ -296,7 +299,10 @@ async function saveScore(entry) {
       const j = await sheetCall(entry);
       scores = j.scores; sheetOk = true;
       return j.id;
-    } catch (e) { /* sem internet: guarda no aparelho */ }
+    } catch (e) {
+      const el = document.getElementById("rank");
+      if (el) el.insertAdjacentHTML("beforebegin", `<p class="note" style="color:var(--bad)">⚠ Não salvou na planilha (${esc(e.message || e)}). Guardado só neste aparelho.</p>`);
+    }
   }
   if (dbRef) {
     try {
