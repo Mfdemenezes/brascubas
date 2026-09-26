@@ -115,13 +115,9 @@
   .ranking .nm { overflow-wrap: anywhere; }
   .ranking .tm { font-size: .9rem; font-style: italic; }
   .ranking .empty, .ranking .note { text-align: center; font-style: italic; font-size: 1rem; margin: .6rem 0 0; }
-  .clear {
-    display: block; margin: 1.5rem auto 0; font: inherit; font-size: .85rem; font-style: italic;
-    background: transparent; color: var(--ink); border: 1px solid rgba(0,0,0,.45); border-radius: 999px;
-    padding: .25rem .8rem; cursor: pointer; opacity: .7;
-  }
-  .clear.armed { opacity: 1; background: var(--bad); color: #fff; border-color: var(--bad); font-style: normal; }
-  .clear:disabled { cursor: wait; }
+  .qr { margin: 2rem auto 0; text-align: center; }
+  .qr svg { display: block; width: 9rem; height: 9rem; margin: 0 auto; background: #fff; padding: .35rem; border: 1.5px solid var(--ink); }
+  .qr p { font-size: .95rem; font-style: italic; margin: .5rem 0 0; }
   @media (max-width: 480px) { .player { grid-template-columns: 1fr; } }
 
   button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
@@ -358,35 +354,7 @@ function renderRanking(el, highlightId) {
     + `<p class="note">${scores.length} ${scores.length === 1 ? "quiz feito" : "quizzes feitos"} · desempate pelo menor tempo</p>`;
 }
 
-function setupClear(btn) {
-  let timer = null;
-  btn.addEventListener("click", async () => {
-    if (!btn.classList.contains("armed")) {
-      btn.classList.add("armed");
-      btn.textContent = "Toque de novo para apagar tudo";
-      timer = setTimeout(() => { btn.classList.remove("armed"); btn.textContent = "Limpar ranking"; }, 4000);
-      return;
-    }
-    clearTimeout(timer);
-    btn.disabled = true;
-    btn.textContent = "Apagando…";
-    let falhou = false;
-    if (SHEET_API) {
-      try { await sheetCall({ action: "clear" }); } catch { falhou = true; }
-    } else if (dbRef) {
-      for (const x of scores) {
-        try { await dbRef.doc(x.id).delete(); } catch { falhou = true; }
-      }
-    }
-    scores = falhou ? scores : [];
-    try { localStorage.removeItem(LS_KEY); } catch {}
-    refreshVisibleRanking();
-    btn.disabled = false;
-    btn.classList.remove("armed");
-    btn.textContent = falhou ? "Não foi possível apagar tudo" : "Ranking limpo ✓";
-    setTimeout(() => { btn.textContent = "Limpar ranking"; }, 2500);
-  });
-}
+const QR_SVG = `<svg role="img" aria-label="QR code do quiz" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 33 33"><path stroke="#000" d="M2 2.5h7m1 0h1m1 0h2m1 0h2m2 0h1m4 0h7m-29 1h1m5 0h1m5 0h2m2 0h1m1 0h1m1 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m1 0h3m2 0h3m1 0h4m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m2 0h3m1 0h4m2 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m3 0h5m3 0h1m3 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m1 0h1m2 0h2m3 0h1m3 0h1m1 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-20 1h1m2 0h1m1 0h2m3 0h2m-21 1h1m1 0h1m3 0h2m1 0h1m2 0h1m2 0h2m2 0h2m2 0h1m2 0h1m1 0h1m-29 1h3m1 0h1m2 0h1m2 0h2m2 0h3m1 0h3m1 0h2m3 0h2m-28 1h1m1 0h1m2 0h3m2 0h2m1 0h2m1 0h1m1 0h2m3 0h3m1 0h1m-29 1h1m1 0h1m1 0h1m2 0h1m2 0h1m3 0h2m2 0h4m1 0h1m1 0h1m-26 1h1m2 0h1m2 0h1m1 0h1m2 0h1m2 0h2m4 0h1m1 0h2m4 0h1m-29 1h2m1 0h2m2 0h3m2 0h2m1 0h2m2 0h1m2 0h2m3 0h2m-28 1h1m2 0h1m1 0h1m2 0h1m1 0h2m2 0h1m2 0h2m2 0h3m3 0h1m-29 1h1m3 0h1m3 0h3m1 0h1m1 0h1m4 0h1m1 0h1m1 0h1m-21 1h4m1 0h1m2 0h1m1 0h4m1 0h2m2 0h2m4 0h1m-27 1h1m6 0h2m1 0h1m2 0h3m1 0h2m1 0h2m2 0h3m-29 1h2m1 0h5m4 0h5m2 0h1m3 0h1m1 0h1m2 0h1m-27 1h1m1 0h2m1 0h2m6 0h1m4 0h1m1 0h2m-24 1h4m2 0h2m2 0h6m3 0h7m1 0h1m-20 1h2m2 0h2m1 0h3m2 0h1m3 0h3m1 0h1m-29 1h7m1 0h3m1 0h1m2 0h4m1 0h1m1 0h1m1 0h1m3 0h1m-29 1h1m5 0h1m3 0h4m1 0h1m2 0h3m3 0h1m-25 1h1m1 0h3m1 0h1m2 0h3m1 0h1m1 0h2m2 0h7m1 0h1m-28 1h1m1 0h3m1 0h1m2 0h1m1 0h3m1 0h3m2 0h2m2 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h5m1 0h2m3 0h1m1 0h1m2 0h1m2 0h2m-29 1h1m5 0h1m2 0h2m1 0h1m1 0h3m1 0h4m1 0h1m1 0h1m-26 1h7m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m2 0h1"/></svg>`;
 
 function refreshVisibleRanking() {
   const el = document.getElementById("rank");
@@ -448,9 +416,8 @@ function renderCover() {
       </div>
       <button class="next" id="go" type="button" disabled>Começar</button>
       <div class="ranking" id="rank"></div>
-      <button class="clear" id="clear" type="button">Limpar ranking</button>
+      <div class="qr">${QR_SVG}<p>Aponte a câmera para jogar no seu celular</p></div>
     </div>`;
-  setupClear(document.getElementById("clear"));
   const fn = document.getElementById("fn"), ln = document.getElementById("ln"), go = document.getElementById("go");
   const check = () => { go.disabled = !(fn.value.trim() && ln.value.trim()); };
   fn.addEventListener("input", check); ln.addEventListener("input", check);
@@ -469,7 +436,7 @@ renderCover();
 
 /* ===== Auto-atualização: sempre a última versão no endereço limpo ===== */
 // Troque APP_VERSION a cada publicação: os aparelhos abertos recarregam sozinhos quando estiverem na capa.
-const APP_VERSION = "2026-09-24.2";
+const APP_VERSION = "2026-09-26.1";
 if (location.search) history.replaceState(null, "", location.pathname);  // some com ?v=3 etc.
 async function checkUpdate() {
   try {
